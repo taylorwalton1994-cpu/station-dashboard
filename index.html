@@ -80,6 +80,7 @@ const base = DB_URL.replace(/\/+$/, "") + "/dashboard";
 
 let tasks = { daily: {}, weekly: {}, monthly: {} };
 let burn = null;
+let auto = null; // automatic status from burnban.json
 let redFlag = null; // null = unknown, [] = none, [events] = active
 let busy = 0;
 
@@ -170,11 +171,22 @@ function addTask(p) {
 document.querySelectorAll("[data-add]").forEach(b => b.onclick = () => addTask(b.dataset.add));
 PERIODS.forEach(p => $("i-" + p).addEventListener("keydown", e => { if (e.key === "Enter") addTask(p); }));
 
+function autoFresh() {
+  return !!(auto && (auto.status === "on" || auto.status === "off") && auto.verifiedAt &&
+    (Date.now() - Date.parse(auto.verifiedAt)) < 36 * 3600000);
+}
+
+function fmtTime(t) {
+  return new Date(t).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
 function renderBurn() {
   const el = $("burn");
   el.textContent = "";
-  const cls = !burn ? "unk" : burn.status === "on" ? "on" : "off";
-  const label = !burn ? "Not set" : burn.status === "on" ? "BURN BAN IN EFFECT" : "No burn ban";
+  const useAuto = autoFresh();
+  const cur = useAuto ? { status: auto.status } : burn;
+  const cls = !cur ? "unk" : cur.status === "on" ? "on" : "off";
+  const label = !cur ? "Not set" : cur.status === "on" ? "BURN BAN IN EFFECT" : "No burn ban";
   const b = document.createElement("div");
   b.className = "ban " + cls;
   b.textContent = label;
@@ -182,21 +194,28 @@ function renderBurn() {
 
   const info = document.createElement("div");
   info.className = "mu";
-  if (!burn) {
-    info.textContent = "No one has set the status yet. Check the Forest Service map below, then use the buttons.";
+  if (useAuto) {
+    info.textContent = "Automatic: Texas A&M Forest Service county list, confirmed " + fmtTime(auto.verifiedAt) + ".";
+  } else if (!burn) {
+    info.textContent = "No status available. Check the Forest Service map below, then use the buttons.";
   } else {
-    const d = new Date(burn.at);
-    info.textContent = "Set by " + (burn.by || "someone") + " on " + d.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+    info.textContent = "Set by " + (burn.by || "someone") + " on " + fmtTime(burn.at);
   }
   el.appendChild(info);
 
-  if (burn) {
-    const days = Math.floor((Date.now() - burn.at) / 86400000);
-    if (days >= 7) {
-      const w = document.createElement("div");
-      w.className = "warn";
-      w.textContent = "Status is " + days + " days old. Please verify with the Forest Service map.";
-      el.appendChild(w);
+  if (!useAuto) {
+    const w = document.createElement("div");
+    w.className = "warn";
+    w.textContent = "Automatic check isn't working right now, so this is the manually set status. Please verify with the Forest Service map.";
+    el.appendChild(w);
+    if (burn) {
+      const days = Math.floor((Date.now() - burn.at) / 86400000);
+      if (days >= 7) {
+        const w2 = document.createElement("div");
+        w2.className = "warn";
+        w2.textContent = "Manual status is " + days + " days old.";
+        el.appendChild(w2);
+      }
     }
   }
 
@@ -212,7 +231,7 @@ function renderBurn() {
   }
   el.appendChild(a);
 
-  if (configured) {
+  if (configured && !useAuto) {
     const btns = document.createElement("div");
     btns.className = "btns";
     const on = document.createElement("button");
@@ -311,6 +330,15 @@ async function loadWeather() {
   }
 }
 
+async function loadAuto() {
+  try {
+    const r = await fetch("burnban.json?t=" + Date.now());
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    auto = await r.json();
+  } catch (e) { auto = null; }
+  renderBurn();
+}
+
 async function loadAlerts() {
   try {
     const j = await (await fetch("https://api.weather.gov/alerts/active?point=" + LAT + "," + LON)).json();
@@ -327,8 +355,9 @@ renderBurn();
 load();
 loadWeather();
 loadAlerts();
+loadAuto();
 setInterval(load, 30000);
-setInterval(() => { loadWeather(); loadAlerts(); }, 15 * 60000);
+setInterval(() => { loadWeather(); loadAlerts(); loadAuto(); }, 15 * 60000);
 </script>
 </body>
 </html>
