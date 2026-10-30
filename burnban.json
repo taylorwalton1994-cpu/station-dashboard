@@ -1,7 +1,7 @@
 {
   "status": null,
   "verifiedAt": null,
-  "checkedAt": "2026-10-30T21:21:18+00:00",
+  "checkedAt": "2026-10-30T21:25:33+00:00",
   "ok": false,
-  "note": "Feed looked empty or unfamiliar (0 county mentions)"
+  "note": "Feed is not valid XML: not well-formed (invalid token): line 1, column 0"
 }
