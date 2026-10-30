@@ -1,7 +1,7 @@
 {
-  "status": null,
-  "verifiedAt": null,
-  "checkedAt": "2026-10-30T21:25:33+00:00",
-  "ok": false,
-  "note": "Feed is not valid XML: not well-formed (invalid token): line 1, column 0"
+  "status": "off",
+  "verifiedAt": "2026-10-30T21:27:31+00:00",
+  "checkedAt": "2026-10-30T21:27:31+00:00",
+  "ok": true,
+  "note": "McLennan not listed in feed (149 counties banned statewide; feed time 10/30/2026 08:18 AM CT)"
 }
