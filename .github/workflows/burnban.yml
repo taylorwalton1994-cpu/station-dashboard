@@ -1,0 +1,74 @@
+name: Update burn ban status
+
+on:
+  schedule:
+    - cron: "17 */3 * * *"   # every 3 hours (GitHub runs on UTC time)
+  workflow_dispatch: {}        # lets you run it by hand from the Actions tab
+
+permissions:
+  contents: write
+
+concurrency:
+  group: burnban
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read Texas A&M Forest Service feed
+        run: |
+          python3 - <<'PY'
+          import json, os, re, urllib.request
+          from datetime import datetime, timezone
+
+          URL = "https://tfsfrp.tamu.edu/WILDFIRES/BURNBAN.XML"
+          now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+          # keep the last good result so a failed check never erases it
+          old = {}
+          if os.path.exists("burnban.json"):
+              try:
+                  old = json.load(open("burnban.json"))
+              except Exception:
+                  old = {}
+
+          out = {
+              "status": old.get("status"),
+              "verifiedAt": old.get("verifiedAt"),
+              "checkedAt": now,
+              "ok": False,
+              "note": "",
+          }
+
+          try:
+              req = urllib.request.Request(URL, headers={"User-Agent": "Mozilla/5.0 station-dashboard"})
+              raw = urllib.request.urlopen(req, timeout=30).read().decode("utf-8", "replace")
+              county_mentions = len(re.findall(r"county", raw, re.I))
+              listed = re.search(r"mc\s*lennan", raw, re.I) is not None
+
+              if county_mentions < 10:
+                  out["note"] = "Feed looked empty or unfamiliar (%d county mentions)" % county_mentions
+              elif listed and county_mentions > 200:
+                  out["note"] = "Feed seems to list every county, so a McLennan match is ambiguous"
+              else:
+                  out["status"] = "on" if listed else "off"
+                  out["verifiedAt"] = now
+                  out["ok"] = True
+                  out["note"] = "McLennan listed in feed" if listed else "McLennan not listed in feed"
+          except Exception as e:
+              out["note"] = "Could not read feed: %s" % e
+
+          json.dump(out, open("burnban.json", "w"), indent=2)
+          print(json.dumps(out, indent=2))
+          PY
+
+      - name: Save result to the repo
+        run: |
+          git config user.name "burnban-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add burnban.json
+          git commit -m "Update burn ban status" || exit 0
+          git push
