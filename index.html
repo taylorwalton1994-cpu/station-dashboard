@@ -321,6 +321,34 @@ function wxIcon(text, day) {
   return "🌡️";
 }
 
+const cToF = c => Math.round(c * 9 / 5 + 32);
+const compass = deg => ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"][Math.round(deg / 22.5) % 16];
+function toMph(o) {
+  if (!o || o.value == null) return null;
+  const mph = /m_s/.test(o.unitCode || "") ? o.value * 2.23694 : o.value * 0.621371; // NWS reports km/h by default
+  return Math.round(mph);
+}
+
+// Latest real measurement from the closest weather stations (skips stations that are not reporting)
+async function getObs(pt) {
+  try {
+    const st = await (await fetch(pt.properties.observationStations)).json();
+    const list = (st.features || []).slice(0, 4);
+    for (const f of list) {
+      try {
+        const id = f.properties.stationIdentifier;
+        const o = await (await fetch("https://api.weather.gov/stations/" + id + "/observations/latest")).json();
+        const p = o.properties;
+        const at = Date.parse(p.timestamp);
+        if (p.temperature && p.temperature.value != null && Date.now() - at < 3 * 3600000) {
+          return { id: id, name: f.properties.name, p: p, at: at };
+        }
+      } catch (e) { /* try the next station */ }
+    }
+  } catch (e) { /* fall back to forecast */ }
+  return null;
+}
+
 async function loadWeather() {
   const el = $("wx");
   try {
@@ -355,6 +383,27 @@ async function loadWeather() {
     w.style.marginTop = "6px";
     const rh = h.relativeHumidity && h.relativeHumidity.value;
     w.textContent = "\ud83d\udca8 Wind " + h.windDirection + " " + h.windSpeed + (rh != null ? "  \u00b7  \ud83d\udca7 RH " + Math.round(rh) + "%" : "");
+    const obs = await getObs(pt);
+    const src = document.createElement("div");
+    src.className = "mu";
+    src.style.marginTop = "4px";
+    src.style.fontSize = "11px";
+    if (obs) {
+      const p = obs.p;
+      const desc = p.textDescription || h.shortForecast;
+      t.textContent = wxIcon(desc, h.isDaytime) + " " + cToF(p.temperature.value) + "°F";
+      c.textContent = desc;
+      const sp = toMph(p.windSpeed), gu = toMph(p.windGust);
+      let wind;
+      if (sp == null) wind = "Wind " + h.windDirection + " " + h.windSpeed;
+      else if (sp === 0) wind = "Wind calm";
+      else wind = "Wind " + (p.windDirection && p.windDirection.value != null ? compass(p.windDirection.value) + " " : "") + sp + " mph" + (gu && gu > sp ? " (gusts " + gu + ")" : "");
+      const rhv = p.relativeHumidity && p.relativeHumidity.value;
+      w.textContent = "💨 " + wind + (rhv != null ? "  ·  💧 RH " + Math.round(rhv) + "%" : "");
+      src.textContent = "Measured at " + (obs.name || obs.id) + " · " + new Date(obs.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    } else {
+      src.textContent = "Live station reading unavailable; showing the NWS forecast for this hour.";
+    }
     const fc = document.createElement("div");
     fc.className = "fc";
     Object.keys(days).slice(0, 3).forEach(k => {
@@ -370,7 +419,7 @@ async function loadWeather() {
         document.createElement("br"), document.createTextNode("\u2614 " + d.pop + "% rain"));
       fc.appendChild(box);
     });
-    el.append(row, w, fc);
+    el.append(row, w, src, fc);
   } catch (e) {
     el.textContent = "Weather unavailable right now.";
   }
