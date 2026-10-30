@@ -22,47 +22,82 @@ jobs:
         run: |
           python3 - <<'PY'
           import json, os, re, urllib.request
-          from datetime import datetime, timezone
+          import xml.etree.ElementTree as ET
+          from datetime import datetime, timezone, timedelta
+          from zoneinfo import ZoneInfo
 
           URL = "https://tfsfrp.tamu.edu/WILDFIRES/BURNBAN.XML"
-          now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+          MAX_FEED_AGE_HOURS = 72
 
-          # keep the last good result so a failed check never erases it
-          old = {}
-          if os.path.exists("burnban.json"):
+
+          def parse(raw, now):
+              """Return (ok, status, note). status is 'on' or 'off' only when ok."""
               try:
-                  old = json.load(open("burnban.json"))
+                  root = ET.fromstring(raw.strip())
+              except ET.ParseError as e:
+                  return False, None, "Feed is not valid XML: %s" % e
+              item = root.find("channel/item")
+              if item is None:
+                  return False, None, "Feed has no item"
+              title = (item.findtext("title") or "").strip()
+              desc = (item.findtext("description") or "").strip()
+
+              m = re.match(r"^(\d+)\s+Texas Burn Bans?\s*-\s*(\d{1,2}/\d{1,2}/\d{4}\s+\d{1,2}:\d{2}:\d{2}\s*[AP]M)", title, re.I)
+              if not m:
+                  return False, None, "Unexpected feed title: %r" % title[:80]
+              expected = int(m.group(1))
+              try:
+                  feed_time = datetime.strptime(re.sub(r"\s+", " ", m.group(2).upper()), "%m/%d/%Y %I:%M:%S %p")
+                  feed_time = feed_time.replace(tzinfo=ZoneInfo("America/Chicago"))
               except Exception:
-                  old = {}
+                  return False, None, "Could not read feed date from title"
 
-          out = {
-              "status": old.get("status"),
-              "verifiedAt": old.get("verifiedAt"),
-              "checkedAt": now,
-              "ok": False,
-              "note": "",
-          }
+              names = [re.sub(r"[^A-Z]", "", n.upper()) for n in desc.split(",")]
+              names = [n for n in names if n]
+              if len(names) != expected:
+                  return False, None, "Feed says %d bans but lists %d counties" % (expected, len(names))
 
-          try:
-              req = urllib.request.Request(URL, headers={"User-Agent": "Mozilla/5.0 station-dashboard"})
-              raw = urllib.request.urlopen(req, timeout=30).read().decode("utf-8", "replace")
-              county_mentions = len(re.findall(r"county", raw, re.I))
-              listed = re.search(r"mc\s*lennan", raw, re.I) is not None
+              age = now - feed_time.astimezone(timezone.utc)
+              if age > timedelta(hours=MAX_FEED_AGE_HOURS):
+                  return False, None, "Feed is stale (last updated %s)" % feed_time.strftime("%m/%d/%Y %I:%M %p")
 
-              if county_mentions < 10:
-                  out["note"] = "Feed looked empty or unfamiliar (%d county mentions)" % county_mentions
-              elif listed and county_mentions > 200:
-                  out["note"] = "Feed seems to list every county, so a McLennan match is ambiguous"
-              else:
-                  out["status"] = "on" if listed else "off"
-                  out["verifiedAt"] = now
-                  out["ok"] = True
-                  out["note"] = "McLennan listed in feed" if listed else "McLennan not listed in feed"
-          except Exception as e:
-              out["note"] = "Could not read feed: %s" % e
+              listed = "MCLENNAN" in names
+              stamp = feed_time.strftime("%m/%d/%Y %I:%M %p CT")
+              note = ("McLennan listed in feed" if listed else "McLennan not listed in feed") + " (%d counties banned statewide; feed time %s)" % (expected, stamp)
+              return True, ("on" if listed else "off"), note
 
-          json.dump(out, open("burnban.json", "w"), indent=2)
-          print(json.dumps(out, indent=2))
+
+          def main():
+              now = datetime.now(timezone.utc)
+              stamp = now.isoformat(timespec="seconds")
+
+              old = {}
+              if os.path.exists("burnban.json"):
+                  try:
+                      old = json.load(open("burnban.json"))
+                  except Exception:
+                      old = {}
+
+              out = {"status": old.get("status"), "verifiedAt": old.get("verifiedAt"),
+                     "checkedAt": stamp, "ok": False, "note": ""}
+              try:
+                  req = urllib.request.Request(URL, headers={"User-Agent": "Mozilla/5.0 station-dashboard"})
+                  raw = urllib.request.urlopen(req, timeout=30).read().decode("utf-8", "replace")
+                  ok, status, note = parse(raw, now)
+                  out["note"] = note
+                  if ok:
+                      out["status"] = status
+                      out["verifiedAt"] = stamp
+                      out["ok"] = True
+              except Exception as e:
+                  out["note"] = "Could not read feed: %s" % e
+
+              json.dump(out, open("burnban.json", "w"), indent=2)
+              print(json.dumps(out, indent=2))
+
+
+          if __name__ == "__main__":
+              main()
           PY
 
       - name: Save result to the repo
