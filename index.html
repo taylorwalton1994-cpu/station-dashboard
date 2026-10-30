@@ -5,169 +5,330 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Station Dashboard</title>
 <style>
-:root{--bg:#f4f5f7;--card:#fff;--tx:#1b1f24;--mu:#667085;--bd:#e1e4e8;--ac:#c8102e;--ok:#1a7f37;--bad:#c8102e}
-@media(prefers-color-scheme:dark){:root{--bg:#14171a;--card:#1e2328;--tx:#eceff2;--mu:#98a2b3;--bd:#2f363d;--ok:#3fb950;--bad:#ff5a5f}}
+:root{--bg:#f4f5f7;--card:#fff;--tx:#1b1f24;--mu:#667085;--bd:#e1e4e8;--ac:#c8102e;--ok:#1a7f37;--bad:#c8102e;--warn:#b25e09}
+@media(prefers-color-scheme:dark){:root{--bg:#14171a;--card:#1e2328;--tx:#eceff2;--mu:#98a2b3;--bd:#2f363d;--ok:#3fb950;--bad:#ff5a5f;--warn:#f0a03c}}
 *{box-sizing:border-box}
 body{margin:0;font:15px/1.4 system-ui,sans-serif;background:var(--bg);color:var(--tx);padding:12px}
-.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));max-width:1100px;margin:auto}
+.grid{display:grid;gap:12px;max-width:1100px;margin:0 auto 12px}
+.top{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+.lists{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
 .card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:14px}
 h2{margin:0 0 8px;font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--mu)}
+h2 span{text-transform:none;letter-spacing:0;font-weight:400}
 .big{font-size:44px;font-weight:700;line-height:1}
 .mu{color:var(--mu);font-size:13px}
 .row{display:flex;justify-content:space-between;gap:8px;align-items:center}
-.ban{font-size:22px;font-weight:700;padding:8px 12px;border-radius:8px;display:inline-block}
-.ban.on{background:var(--bad);color:#fff}.ban.off{background:var(--ok);color:#fff}.ban.unk{background:var(--mu);color:#fff}
-.fc{display:flex;gap:6px;margin-top:10px}.fc div{flex:1;text-align:center;font-size:12px;border:1px solid var(--bd);border-radius:6px;padding:4px}
-.tabs{display:flex;gap:6px;margin-bottom:8px}
-.tabs button{flex:1;padding:6px;border:1px solid var(--bd);background:none;color:var(--tx);border-radius:6px;cursor:pointer}
-.tabs button.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+.fc{display:flex;gap:6px;margin-top:10px}
+.fc div{flex:1;text-align:center;font-size:12px;border:1px solid var(--bd);border-radius:6px;padding:4px}
+.ban{font-size:22px;font-weight:700;padding:8px 12px;border-radius:8px;display:inline-block;color:#fff;margin-bottom:6px}
+.ban.on{background:var(--bad)}.ban.off{background:var(--ok)}.ban.unk{background:var(--mu)}
+.alert{margin:8px 0;padding:8px;border-radius:6px;font-size:13px;border:1px solid var(--bd)}
+.alert.hot{border-color:var(--warn);color:var(--warn);font-weight:600}
+.warn{color:var(--warn);font-size:13px;margin:6px 0}
 ul{list-style:none;margin:0;padding:0}
 li{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--bd)}
 li.done span{text-decoration:line-through;color:var(--mu)}
-li span{flex:1}
+li span{flex:1;word-break:break-word}
 input[type=checkbox]{width:18px;height:18px;accent-color:var(--ac)}
-input[type=text],input[type=email],input[type=password]{width:100%;padding:8px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--tx)}
+input[type=text]{width:100%;padding:8px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--tx)}
 button.b{padding:7px 12px;border:0;border-radius:6px;background:var(--ac);color:#fff;cursor:pointer}
+button.b.g{background:#1a7f37}
 button.x{background:none;border:0;color:var(--mu);cursor:pointer;font-size:16px}
-.adm{display:flex}
-.link{background:none;border:0;color:var(--mu);text-decoration:underline;cursor:pointer;font-size:12px}
-#login{display:none;margin-top:8px;gap:6px;flex-direction:column}
-a{color:#4493f8}
+.add{display:flex;gap:6px;margin-top:10px}
+.btns{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+a{color:#2f6fdb}
+#cfg{display:none;max-width:1100px;margin:0 auto 12px;padding:12px;border-radius:8px;background:var(--warn);color:#000;font-weight:600}
 </style>
 </head>
 <body>
-<div class="grid">
+<div id="cfg">Setup needed: paste your Firebase database URL into DB_URL near the top of the script in index.html.</div>
 
-<div class="card"><h2>Weather · Lorena, TX</h2>
-  <div id="wx" class="mu">Loading…</div></div>
-
-<div class="card"><h2>McLennan County Burn Ban</h2>
-  <div id="ban"><span class="ban unk">Loading…</span></div>
-  <div id="banNote" class="mu" style="margin-top:6px"></div>
-  <div id="fireWx" style="margin-top:8px"></div>
-  <div class="adm" style="margin-top:10px;gap:6px;flex-wrap:wrap">
-    <button class="b" onclick="setBan(true)">Set: Burn ban ACTIVE</button>
-    <button class="b" style="background:var(--ok)" onclick="setBan(false)">Set: No burn ban</button>
+<div class="grid top">
+  <div class="card">
+    <h2>Weather &middot; Lorena, TX</h2>
+    <div id="wx" class="mu">Loading&hellip;</div>
   </div>
-  <div class="mu" style="margin-top:8px">Verify: <a href="https://tfsweb.tamu.edu/BurnBans/" target="_blank" rel="noopener">Texas A&amp;M Forest Service burn ban map</a></div>
+  <div class="card">
+    <h2>McLennan County burn ban</h2>
+    <div id="burn" class="mu">Loading&hellip;</div>
+  </div>
 </div>
 
-<div style="grid-column:1/-1" class="mu">Anyone with this link can edit.</div>
-<div class="card"><h2>Daily To-Do <span class="mu" style="text-transform:none;letter-spacing:0">· Resets every day</span></h2>
-  <ul id="list-daily"></ul>
-  <div class="adm" style="margin-top:10px;gap:6px"><input type="text" id="new-daily" placeholder="Add task…"><button class="b" onclick="addItem('daily')">Add</button></div>
-</div>
-<div class="card"><h2>Weekly To-Do <span class="mu" style="text-transform:none;letter-spacing:0">· Resets every week</span></h2>
-  <ul id="list-weekly"></ul>
-  <div class="adm" style="margin-top:10px;gap:6px"><input type="text" id="new-weekly" placeholder="Add task…"><button class="b" onclick="addItem('weekly')">Add</button></div>
-</div>
-<div class="card"><h2>Monthly To-Do <span class="mu" style="text-transform:none;letter-spacing:0">· Resets every month</span></h2>
-  <ul id="list-monthly"></ul>
-  <div class="adm" style="margin-top:10px;gap:6px"><input type="text" id="new-monthly" placeholder="Add task…"><button class="b" onclick="addItem('monthly')">Add</button></div>
+<div class="grid"><div class="mu">Anyone with this link can edit. <span id="sync"></span></div></div>
+
+<div class="grid lists">
+  <div class="card"><h2>Daily to-do <span>&middot; Resets every day</span></h2><ul id="l-daily"></ul>
+    <div class="add"><input type="text" id="i-daily" placeholder="Add task&hellip;"><button class="b" data-add="daily">Add</button></div></div>
+  <div class="card"><h2>Weekly to-do <span>&middot; Resets every Monday</span></h2><ul id="l-weekly"></ul>
+    <div class="add"><input type="text" id="i-weekly" placeholder="Add task&hellip;"><button class="b" data-add="weekly">Add</button></div></div>
+  <div class="card"><h2>Monthly to-do <span>&middot; Resets every month</span></h2><ul id="l-monthly"></ul>
+    <div class="add"><input type="text" id="i-monthly" placeholder="Add task&hellip;"><button class="b" data-add="monthly">Add</button></div></div>
 </div>
 
-</div>
 <script>
-// ====== PASTE YOUR JSONBLOB ID HERE (see setup steps) ======
-const BLOB_ID = "01a18e06-26b5-70b2-a726-404f38b4a2ad";
-// ============================================================
-const API = "https://jsonblob.com/api/jsonBlob/" + BLOB_ID;
-const HDR = {'Content-Type':'application/json','Accept':'application/json'};
-const LAT = 31.3818, LON = -97.2142;
+// ====== PASTE YOUR FIREBASE DATABASE URL HERE, between the quotes ======
+// Example: https://my-station-default-rtdb.firebaseio.com
+const DB_URL = "https://station-dashboard-fcdbd-default-rtdb.firebaseio.com";
+// =======================================================================
+
+const LAT = 31.3835, LON = -97.2128; // Lorena, TX
+const PERIODS = ["daily", "weekly", "monthly"];
 const $ = id => document.getElementById(id);
-const blank=()=>({burn:null,lists:{daily:[],weekly:[],monthly:[]}});
-let state=blank(), isAdmin=true;
+const pad = n => String(n).padStart(2, "0");
+const configured = DB_URL && DB_URL.indexOf("PASTE_") < 0;
+const base = DB_URL.replace(/\/+$/, "") + "/dashboard";
 
-// ---- Period keys (auto-reset checkmarks) ----
-function periodKey(t){
-  const d=new Date();
-  if(t==='daily') return d.toLocaleDateString('en-CA');
-  if(t==='monthly') return d.toLocaleDateString('en-CA').slice(0,7);
-  const u=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
-  const day=u.getUTCDay()||7; u.setUTCDate(u.getUTCDate()+4-day);
-  const y0=new Date(Date.UTC(u.getUTCFullYear(),0,1));
-  return u.getUTCFullYear()+'-W'+Math.ceil(((u-y0)/864e5+1)/7);
+let tasks = { daily: {}, weekly: {}, monthly: {} };
+let burn = null;
+let redFlag = null; // null = unknown, [] = none, [events] = active
+let busy = 0;
+
+function keys() {
+  const d = new Date();
+  const day = d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  const m = new Date(d);
+  m.setDate(m.getDate() - ((m.getDay() + 6) % 7)); // Monday
+  const wk = m.getFullYear() + "-" + pad(m.getMonth() + 1) + "-" + pad(m.getDate());
+  return { daily: day, weekly: wk, monthly: day.slice(0, 7) };
 }
 
-// ---- Weather (Open-Meteo, no key) ----
-const WC={0:'Clear',1:'Mostly clear',2:'Partly cloudy',3:'Overcast',45:'Fog',48:'Fog',51:'Light drizzle',53:'Drizzle',55:'Heavy drizzle',61:'Light rain',63:'Rain',65:'Heavy rain',71:'Snow',80:'Showers',81:'Showers',82:'Heavy showers',95:'Thunderstorm',96:'Thunderstorm, hail',99:'Thunderstorm, hail'};
-function compass(d){return ['N','NE','E','SE','S','SW','W','NW'][Math.round(d/45)%8]}
-async function wxOpenMeteo(){
-  const u=`https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=America%2FChicago&forecast_days=4`;
-  const r=await fetch(u); if(!r.ok)throw new Error('Open-Meteo HTTP '+r.status);
-  const j=await r.json(), c=j.current, d=j.daily;
-  $('wx').innerHTML=`<div class="row"><div class="big">${Math.round(c.temperature_2m)}°F</div><div style="text-align:right">${WC[c.weather_code]||''}<div class="mu">Feels ${Math.round(c.apparent_temperature)}°</div></div></div>
-  <div class="mu" style="margin-top:8px">Wind ${compass(c.wind_direction_10m)} ${Math.round(c.wind_speed_10m)} mph (gusts ${Math.round(c.wind_gusts_10m)}) · RH ${c.relative_humidity_2m}%</div>
-  <div class="fc">${d.time.slice(1).map((t,i)=>`<div><b>${new Date(t+'T12:00').toLocaleDateString([], {weekday:'short'})}</b><br>${Math.round(d.temperature_2m_max[i+1])}°/${Math.round(d.temperature_2m_min[i+1])}°<br>${d.precipitation_probability_max[i+1]}% rain</div>`).join('')}</div>`;
+async function db(path, method, body) {
+  const opt = { method: method || "GET" };
+  if (body !== undefined) {
+    opt.headers = { "Content-Type": "application/json" };
+    opt.body = JSON.stringify(body);
+  }
+  const r = await fetch(base + path + ".json", opt);
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  return r.json();
 }
-async function wxNWS(){
-  const p=await fetch(`https://api.weather.gov/points/${LAT},${LON}`); if(!p.ok)throw new Error('NWS HTTP '+p.status);
-  const f=await fetch((await p.json()).properties.forecast); if(!f.ok)throw new Error('NWS forecast HTTP '+f.status);
-  const per=(await f.json()).properties.periods, n=per[0];
-  $('wx').innerHTML=`<div class="row"><div class="big">${n.temperature}°${n.temperatureUnit}</div><div style="text-align:right">${n.shortForecast}</div></div>
-  <div class="mu" style="margin-top:8px">Wind ${n.windDirection} ${n.windSpeed}</div>
-  <div class="fc">${per.slice(1,4).map(x=>`<div><b>${x.name}</b><br>${x.temperature}°<br>${x.shortForecast}</div>`).join('')}</div>`;
+
+async function save(fn) {
+  busy++;
+  try { await fn(); }
+  catch (e) { alert("Could not save (" + e.message + "). Check your connection and try again."); }
+  finally { busy--; }
+  load();
 }
-async function loadWx(){
-  try{ await wxOpenMeteo(); }
-  catch(e1){
-    try{ await wxNWS(); }
-    catch(e2){ $('wx').innerHTML='Weather unavailable.<div class="mu" style="margin-top:6px">'+esc(String(e1.message||e1))+' / '+esc(String(e2.message||e2))+'</div>'; }
+
+function renderLists() {
+  const k = keys();
+  PERIODS.forEach(p => {
+    const ul = $("l-" + p);
+    const entries = Object.entries(tasks[p] || {}).sort((a, b) => (a[1].c || 0) - (b[1].c || 0));
+    ul.textContent = "";
+    if (!entries.length) {
+      const li = document.createElement("li");
+      li.className = "mu";
+      li.textContent = "No tasks.";
+      ul.appendChild(li);
+      return;
+    }
+    entries.forEach(([id, t]) => {
+      const done = t.done === k[p];
+      const li = document.createElement("li");
+      if (done) li.className = "done";
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.checked = done;
+      cb.onchange = () => {
+        t.done = cb.checked ? k[p] : null;
+        renderLists();
+        save(() => db("/tasks/" + p + "/" + id + "/done", "PUT", cb.checked ? k[p] : null));
+      };
+      const sp = document.createElement("span");
+      sp.textContent = t.text;
+      const x = document.createElement("button");
+      x.className = "x";
+      x.textContent = "\u00d7";
+      x.title = "Delete";
+      x.onclick = () => {
+        if (!confirm("Delete this task?")) return;
+        delete tasks[p][id];
+        renderLists();
+        save(() => db("/tasks/" + p + "/" + id, "DELETE"));
+      };
+      li.append(cb, sp, x);
+      ul.appendChild(li);
+    });
+  });
+}
+
+function addTask(p) {
+  const inp = $("i-" + p);
+  const text = inp.value.trim();
+  if (!text) return;
+  inp.value = "";
+  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+  const t = { text: text, c: Date.now() };
+  tasks[p] = tasks[p] || {};
+  tasks[p][id] = t;
+  renderLists();
+  save(() => db("/tasks/" + p + "/" + id, "PUT", t));
+}
+
+document.querySelectorAll("[data-add]").forEach(b => b.onclick = () => addTask(b.dataset.add));
+PERIODS.forEach(p => $("i-" + p).addEventListener("keydown", e => { if (e.key === "Enter") addTask(p); }));
+
+function renderBurn() {
+  const el = $("burn");
+  el.textContent = "";
+  const cls = !burn ? "unk" : burn.status === "on" ? "on" : "off";
+  const label = !burn ? "Not set" : burn.status === "on" ? "BURN BAN IN EFFECT" : "No burn ban";
+  const b = document.createElement("div");
+  b.className = "ban " + cls;
+  b.textContent = label;
+  el.appendChild(b);
+
+  const info = document.createElement("div");
+  info.className = "mu";
+  if (!burn) {
+    info.textContent = "No one has set the status yet. Check the Forest Service map below, then use the buttons.";
+  } else {
+    const d = new Date(burn.at);
+    info.textContent = "Set by " + (burn.by || "someone") + " on " + d.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  }
+  el.appendChild(info);
+
+  if (burn) {
+    const days = Math.floor((Date.now() - burn.at) / 86400000);
+    if (days >= 7) {
+      const w = document.createElement("div");
+      w.className = "warn";
+      w.textContent = "Status is " + days + " days old. Please verify with the Forest Service map.";
+      el.appendChild(w);
+    }
+  }
+
+  const a = document.createElement("div");
+  a.className = "alert";
+  if (redFlag === null) {
+    a.textContent = "NWS fire weather alerts: unavailable right now.";
+  } else if (redFlag.length) {
+    a.className += " hot";
+    a.textContent = "NWS: " + redFlag.join(", ") + " active. McLennan County's standing order bans outdoor burning in unincorporated areas during a Red Flag Warning.";
+  } else {
+    a.textContent = "NWS: no Red Flag Warning or Fire Weather Watch right now.";
+  }
+  el.appendChild(a);
+
+  if (configured) {
+    const btns = document.createElement("div");
+    btns.className = "btns";
+    const on = document.createElement("button");
+    on.className = "b";
+    on.textContent = "Set: Burn ban ACTIVE";
+    on.onclick = () => setBurn("on");
+    const off = document.createElement("button");
+    off.className = "b g";
+    off.textContent = "Set: No burn ban";
+    off.onclick = () => setBurn("off");
+    btns.append(on, off);
+    el.appendChild(btns);
+  }
+
+  const l = document.createElement("div");
+  l.className = "mu";
+  l.innerHTML = 'Verify: <a href="https://tfsweb.tamu.edu/TexasBurnBans" target="_blank" rel="noopener">Texas A&amp;M Forest Service burn ban map</a>';
+  el.appendChild(l);
+}
+
+function setBurn(status) {
+  let name = "";
+  try { name = localStorage.getItem("dash_name") || ""; } catch (e) {}
+  name = prompt("Your name:", name);
+  if (!name) return;
+  try { localStorage.setItem("dash_name", name); } catch (e) {}
+  burn = { status: status, by: name.trim().slice(0, 40), at: Date.now() };
+  renderBurn();
+  save(() => db("/burn", "PUT", burn));
+}
+
+async function load() {
+  if (!configured || busy) return;
+  try {
+    const data = (await db("")) || {};
+    const t = data.tasks || {};
+    PERIODS.forEach(p => { tasks[p] = t[p] || {}; });
+    burn = data.burn || null;
+    $("sync").textContent = "";
+  } catch (e) {
+    $("sync").textContent = "(can't reach storage: " + e.message + ")";
+  }
+  renderLists();
+  renderBurn();
+}
+
+async function loadWeather() {
+  const el = $("wx");
+  try {
+    const pt = await (await fetch("https://api.weather.gov/points/" + LAT + "," + LON)).json();
+    const [hourly, daily] = await Promise.all([
+      fetch(pt.properties.forecastHourly).then(r => r.json()),
+      fetch(pt.properties.forecast).then(r => r.json())
+    ]);
+    const h = hourly.properties.periods[0];
+    const days = {};
+    daily.properties.periods.forEach(p => {
+      const k = p.startTime.slice(0, 10);
+      const d = days[k] = days[k] || { name: null, hi: null, lo: null, pop: 0 };
+      if (p.isDaytime) { d.hi = p.temperature; d.name = p.name; }
+      else { d.lo = p.temperature; if (!d.name) d.name = p.name; }
+      d.pop = Math.max(d.pop, (p.probabilityOfPrecipitation && p.probabilityOfPrecipitation.value) || 0);
+    });
+    el.textContent = "";
+    el.className = "";
+    const row = document.createElement("div");
+    row.className = "row";
+    const t = document.createElement("div");
+    t.className = "big";
+    t.textContent = h.temperature + "\u00b0F";
+    const c = document.createElement("div");
+    c.className = "mu";
+    c.style.textAlign = "right";
+    c.textContent = h.shortForecast;
+    row.append(t, c);
+    const w = document.createElement("div");
+    w.className = "mu";
+    w.style.marginTop = "6px";
+    const rh = h.relativeHumidity && h.relativeHumidity.value;
+    w.textContent = "Wind " + h.windDirection + " " + h.windSpeed + (rh != null ? " \u00b7 RH " + Math.round(rh) + "%" : "");
+    const fc = document.createElement("div");
+    fc.className = "fc";
+    Object.keys(days).slice(0, 3).forEach(k => {
+      const d = days[k];
+      const box = document.createElement("div");
+      const nm = document.createElement("b");
+      nm.textContent = d.name.replace(/ Night$/, "").replace(/^This Afternoon$/, "Today");
+      box.append(nm, document.createElement("br"),
+        document.createTextNode((d.hi != null ? d.hi + "\u00b0" : "\u2014") + "/" + (d.lo != null ? d.lo + "\u00b0" : "\u2014")),
+        document.createElement("br"), document.createTextNode(d.pop + "% rain"));
+      fc.appendChild(box);
+    });
+    el.append(row, w, fc);
+  } catch (e) {
+    el.textContent = "Weather unavailable right now.";
   }
 }
-async function loadFireWx(){
-  try{
-    const r=await fetch(`https://api.weather.gov/alerts/active?point=${LAT},${LON}`); if(!r.ok)throw 0;
-    const a=(await r.json()).features.map(f=>f.properties).filter(p=>/red flag|fire weather/i.test(p.event));
-    $('fireWx').innerHTML=a.length?a.map(p=>`<div style="background:#b54708;color:#fff;border-radius:6px;padding:6px 8px;margin-top:4px"><b>⚠ ${esc(p.event)}</b><div style="font-size:12px">${esc(p.headline||'')}</div></div>`).join(''):'<div class="mu">NWS: no Red Flag Warning or Fire Weather Watch right now.</div>';
-  }catch(e){$('fireWx').innerHTML='<div class="mu">NWS fire weather alerts unavailable.</div>'}
-}
-loadWx(); loadFireWx(); setInterval(loadWx,15*60e3); setInterval(loadFireWx,15*60e3);
 
-// ---- Render ----
-function renderBan(){
-  const b=state.burn;
-  if(!b){$('ban').innerHTML='<span class="ban unk">Not set</span>';$('banNote').textContent='No one has set the status yet. Check the Forest Service map below, then use the buttons.';return}
-  $('ban').innerHTML=b.active?'<span class="ban on">🔥 BURN BAN IN EFFECT</span>':'<span class="ban off">No burn ban</span>';
-  const days=Math.floor((Date.now()-b.updated)/864e5);
-  $('banNote').textContent='Updated '+new Date(b.updated).toLocaleString()+(b.by?' by '+b.by:'')+(days>=7?' — '+days+' days old, please verify':'');
+async function loadAlerts() {
+  try {
+    const j = await (await fetch("https://api.weather.gov/alerts/active?point=" + LAT + "," + LON)).json();
+    redFlag = j.features
+      .map(f => f.properties.event)
+      .filter(e => e === "Red Flag Warning" || e === "Fire Weather Watch");
+  } catch (e) { redFlag = null; }
+  renderBurn();
 }
-function renderList(t){
-  const k=periodKey(t), items=state.lists[t]||[];
-  $('list-'+t).innerHTML=items.length?items.map((it,i)=>{
-    const done=it.done===k;
-    return `<li class="${done?'done':''}"><input type="checkbox" ${done?'checked':''} onchange="toggle('${t}',${i})"><span>${esc(it.text)}</span><button class="x" onclick="del('${t}',${i})" title="Delete">✕</button></li>`;
-  }).join(''):'<li class="mu">No tasks.</li>';
-}
-const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-function render(){renderBan();['daily','weekly','monthly'].forEach(renderList)}
 
-// ---- Shared storage (jsonblob.com) ----
-async function pull(){
-  const r=await fetch(API,{headers:HDR,cache:'no-store'}); if(!r.ok)throw 0;
-  const d=await r.json(); state=Object.assign(blank(),d); state.lists=Object.assign(blank().lists,d.lists);
-}
-async function mutate(fn){
-  try{ await pull(); fn(); await fetch(API,{method:'PUT',headers:HDR,body:JSON.stringify(state)}); }
-  catch(e){ alert('Could not save. Check your connection and try again.'); }
-  render();
-}
-async function refresh(){ if(!BLOB_ID)return; try{await pull();render()}catch(e){$('banNote').textContent='Could not load data.'} }
-function who(){
-  let n=''; try{n=localStorage.getItem('dashName')||''}catch(e){}
-  if(!n){n=prompt('Your name (shown on burn ban updates):')||'';try{localStorage.setItem('dashName',n)}catch(e){}}
-  return n;
-}
-function setBan(active){ const by=who(); mutate(()=>{state.burn={active,updated:Date.now(),by}}); }
-function addItem(t){
-  const inp=$('new-'+t), x=inp.value.trim(); if(!x)return; inp.value='';
-  mutate(()=>{state.lists[t].push({text:x,done:''})});
-}
-function del(t,i){ if(confirm('Delete this task?')) mutate(()=>{state.lists[t].splice(i,1)}); }
-function toggle(t,i){ const k=periodKey(t); mutate(()=>{const it=state.lists[t][i]; if(it)it.done=it.done===k?'':k}); }
-refresh(); setInterval(refresh,30000);
-['daily','weekly','monthly'].forEach(t=>$('new-'+t).addEventListener('keydown',e=>{if(e.key==='Enter')addItem(t)}));
-render();
+if (!configured) $("cfg").style.display = "block";
+renderLists();
+renderBurn();
+load();
+loadWeather();
+loadAlerts();
+setInterval(load, 30000);
+setInterval(() => { loadWeather(); loadAlerts(); }, 15 * 60000);
 </script>
 </body>
 </html>
