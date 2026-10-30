@@ -30,12 +30,28 @@ jobs:
           MAX_FEED_AGE_HOURS = 72
 
 
-          def parse(raw, now):
-              """Return (ok, status, note). status is 'on' or 'off' only when ok."""
+          def to_root(raw):
+              """Parse feed bytes, tolerating a byte-order mark or UTF-16 text."""
               try:
-                  root = ET.fromstring(raw.strip())
+                  return ET.fromstring(raw)
+              except ET.ParseError:
+                  pass
+              for enc in ("utf-8-sig", "utf-16"):
+                  try:
+                      text = raw.decode(enc).strip()
+                      text = re.sub(r"^<\?xml[^>]*\?>", "", text).strip()
+                      return ET.fromstring(text)
+                  except Exception:
+                      continue
+              raise ET.ParseError("could not read feed text")
+
+
+          def parse(raw, now):
+              """Return (ok, status, note). raw is bytes. status is 'on' or 'off' only when ok."""
+              try:
+                  root = to_root(raw)
               except ET.ParseError as e:
-                  return False, None, "Feed is not valid XML: %s" % e
+                  return False, None, "Feed is not valid XML (%s). First bytes: %r" % (e, raw[:60])
               item = root.find("channel/item")
               if item is None:
                   return False, None, "Feed has no item"
@@ -82,7 +98,7 @@ jobs:
                      "checkedAt": stamp, "ok": False, "note": ""}
               try:
                   req = urllib.request.Request(URL, headers={"User-Agent": "Mozilla/5.0 station-dashboard"})
-                  raw = urllib.request.urlopen(req, timeout=30).read().decode("utf-8", "replace")
+                  raw = urllib.request.urlopen(req, timeout=30).read()
                   ok, status, note = parse(raw, now)
                   out["note"] = note
                   if ok:
