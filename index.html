@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Station Dashboard</title>
 <style>
-:root{--bg:#f4f5f7;--card:#fff;--tx:#1b1f24;--mu:#667085;--bd:#e1e4e8;--ac:#c8102e;--ok:#1a7f37;--bad:#c8102e;--warn:#b25e09}
+:root{color-scheme:light dark;--bg:#f4f5f7;--card:#fff;--tx:#1b1f24;--mu:#667085;--bd:#e1e4e8;--ac:#c8102e;--ok:#1a7f37;--bad:#c8102e;--warn:#b25e09}
 @media(prefers-color-scheme:dark){:root{--bg:#14171a;--card:#1e2328;--tx:#eceff2;--mu:#98a2b3;--bd:#2f363d;--ok:#3fb950;--bad:#ff5a5f;--warn:#f0a03c}}
 *{box-sizing:border-box}
 body{margin:0;font:15px/1.4 system-ui,sans-serif;background:var(--bg);color:var(--tx);padding:12px}
@@ -37,12 +37,19 @@ button.b.g{background:#1a7f37}
 button.x{background:none;border:0;color:var(--mu);cursor:pointer;font-size:16px}
 .add{display:flex;gap:6px;margin-top:10px}
 .btns{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.evform{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.evform input[type=text]{flex:2 1 200px;width:auto}
+.evform input[type=date],.evform input[type=time]{flex:1 1 120px;padding:8px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--tx);font:inherit}
+.ev-when{flex:0 0 150px;font-size:13px;color:var(--mu)}
+li.ev-today .ev-when{color:var(--ok);font-weight:700}
+li.ev-past{opacity:.65}
+details summary{cursor:pointer;margin-top:10px}
 a{color:#2f6fdb}
 #cfg{display:none;max-width:1100px;margin:0 auto 12px;padding:12px;border-radius:8px;background:var(--warn);color:#000;font-weight:600}
 </style>
 </head>
 <body>
-<div id="cfg">Setup needed: paste your Firebase database URL into DB_URL near the top of the script in index.html.</div>
+<div id="cfg">Setup needed: add the file config.js to your repo with your Firebase database URL (see the setup steps).</div>
 
 <div class="grid top">
   <div class="card">
@@ -66,20 +73,37 @@ a{color:#2f6fdb}
     <div class="add"><input type="text" id="i-monthly" placeholder="Add task&hellip;"><button class="b" data-add="monthly">Add</button></div></div>
 </div>
 
+<div class="grid">
+  <div class="card">
+    <h2>Upcoming events <span>&middot; Sorted by date and time</span></h2>
+    <ul id="l-events"></ul>
+    <div class="evform">
+      <input type="text" id="e-title" placeholder="Event name&hellip;" maxlength="120">
+      <input type="date" id="e-date" title="Date">
+      <input type="time" id="e-time" title="Time (optional, leave blank for all day)">
+      <button class="b" id="e-add">Add event</button>
+    </div>
+    <details id="e-pastbox" style="display:none">
+      <summary class="mu">Past events (<span id="e-pastn">0</span>)</summary>
+      <ul id="l-past"></ul>
+    </details>
+  </div>
+</div>
+
+<script src="config.js"></script>
 <script>
-// ====== PASTE YOUR FIREBASE DATABASE URL HERE, between the quotes ======
-// Example: https://my-station-default-rtdb.firebaseio.com
-const DB_URL = "https://station-dashboard-fcdbd-default-rtdb.firebaseio.com";
-// =======================================================================
+// The Firebase address lives in config.js so updates to this file never erase it.
+const DB_URL = (window.DASH_CONFIG && window.DASH_CONFIG.dbUrl) || "";
 
 const LAT = 31.3835, LON = -97.2128; // Lorena, TX
 const PERIODS = ["daily", "weekly", "monthly"];
 const $ = id => document.getElementById(id);
 const pad = n => String(n).padStart(2, "0");
-const configured = DB_URL && DB_URL.indexOf("PASTE_") < 0;
+const configured = !!DB_URL;
 const base = DB_URL.replace(/\/+$/, "") + "/dashboard";
 
 let tasks = { daily: {}, weekly: {}, monthly: {} };
+let events = {};
 let burn = null;
 let auto = null; // automatic status from burnban.json
 let redFlag = null; // null = unknown, [] = none, [events] = active
@@ -271,11 +295,13 @@ async function load() {
     const t = data.tasks || {};
     PERIODS.forEach(p => { tasks[p] = t[p] || {}; });
     burn = data.burn || null;
+    events = data.events || {};
     $("sync").textContent = "";
   } catch (e) {
     $("sync").textContent = "(can't reach storage: " + e.message + ")";
   }
   renderLists();
+  renderEvents();
   renderBurn();
 }
 
@@ -350,6 +376,110 @@ async function loadWeather() {
   }
 }
 
+// ---------- Events ----------
+const EVENT_GRACE_MIN = 60; // a timed event stays "upcoming" for 1 hour after it starts
+
+function evParts(e) {
+  const [y, m, d] = e.date.split("-").map(Number);
+  let hh = null, mm = null;
+  if (e.time) [hh, mm] = e.time.split(":").map(Number);
+  return { y, m, d, hh, mm };
+}
+
+function evOverAt(e) {
+  const p = evParts(e);
+  if (p.hh == null) return new Date(p.y, p.m - 1, p.d + 1).getTime(); // all-day: over at midnight
+  return new Date(p.y, p.m - 1, p.d, p.hh, p.mm).getTime() + EVENT_GRACE_MIN * 60000;
+}
+
+function evKey(e) { return e.date + "T" + (e.time || "00:00"); }
+
+function splitEvents(all, now) {
+  const list = Object.entries(all || {}).filter(([id, e]) => e && e.title && /^\d{4}-\d{2}-\d{2}$/.test(e.date || ""));
+  const up = list.filter(([id, e]) => evOverAt(e) > now)
+    .sort((a, b) => evKey(a[1]).localeCompare(evKey(b[1])) || (a[1].c || 0) - (b[1].c || 0));
+  const past = list.filter(([id, e]) => evOverAt(e) <= now)
+    .sort((a, b) => evKey(b[1]).localeCompare(evKey(a[1])));
+  return { up, past };
+}
+
+function evLabel(e, now) {
+  const p = evParts(e);
+  const day = new Date(p.y, p.m - 1, p.d);
+  const today = new Date(now); today.setHours(0, 0, 0, 0);
+  const diff = Math.round((day - today) / 86400000);
+  const dayTxt = diff === 0 ? "Today" : diff === 1 ? "Tomorrow" : diff === -1 ? "Yesterday"
+    : day.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+  const timeTxt = p.hh == null ? "All day"
+    : new Date(2000, 0, 1, p.hh, p.mm).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return { text: dayTxt + " · " + timeTxt, today: diff === 0 };
+}
+
+function evRow(id, e, isPast, now) {
+  const lab = evLabel(e, now);
+  const li = document.createElement("li");
+  li.className = isPast ? "ev-past" : (lab.today ? "ev-today" : "");
+  const w = document.createElement("div");
+  w.className = "ev-when";
+  w.textContent = lab.text;
+  const sp = document.createElement("span");
+  sp.textContent = e.title;
+  const x = document.createElement("button");
+  x.className = "x";
+  x.textContent = "×";
+  x.title = "Delete";
+  x.onclick = () => {
+    if (!confirm("Delete this event?")) return;
+    delete events[id];
+    renderEvents();
+    save(() => db("/events/" + id, "DELETE"));
+  };
+  li.append(w, sp, x);
+  return li;
+}
+
+function renderEvents() {
+  const now = Date.now();
+  const { up, past } = splitEvents(events, now);
+  const ul = $("l-events"), pl = $("l-past");
+  ul.textContent = "";
+  pl.textContent = "";
+  if (!up.length) {
+    const li = document.createElement("li");
+    li.className = "mu";
+    li.textContent = "No upcoming events.";
+    ul.appendChild(li);
+  }
+  up.forEach(([id, e]) => ul.appendChild(evRow(id, e, false, now)));
+  past.forEach(([id, e]) => pl.appendChild(evRow(id, e, true, now)));
+  $("e-pastn").textContent = past.length;
+  $("e-pastbox").style.display = past.length ? "block" : "none";
+}
+
+function todayStr() {
+  const d = new Date();
+  return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+}
+
+function addEvent() {
+  const title = $("e-title").value.trim().slice(0, 120);
+  const date = $("e-date").value;
+  const time = $("e-time").value;
+  if (!title) { $("e-title").focus(); return; }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { alert("Please pick a date for the event."); return; }
+  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+  const ev = { title: title, date: date, time: /^\d{2}:\d{2}$/.test(time) ? time : "", c: Date.now() };
+  events[id] = ev;
+  $("e-title").value = "";
+  $("e-time").value = "";
+  renderEvents();
+  save(() => db("/events/" + id, "PUT", ev));
+}
+
+$("e-add").onclick = addEvent;
+$("e-title").addEventListener("keydown", e => { if (e.key === "Enter") addEvent(); });
+$("e-date").value = todayStr();
+
 async function loadAuto() {
   try {
     const r = await fetch("burnban.json?t=" + Date.now());
@@ -371,8 +501,10 @@ async function loadAlerts() {
 
 if (!configured) $("cfg").style.display = "block";
 renderLists();
+renderEvents();
 renderBurn();
 load();
+setInterval(renderEvents, 60000);
 loadWeather();
 loadAlerts();
 loadAuto();
