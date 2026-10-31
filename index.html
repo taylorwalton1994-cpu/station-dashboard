@@ -57,7 +57,7 @@ a{color:#2f6fdb}
     <div id="wx" class="mu">Loading&hellip;</div>
   </div>
   <div class="card">
-    <h2>McLennan County burn ban</h2>
+    <h2>McLennan County Burn Ban</h2>
     <div id="burn" class="mu">Loading&hellip;</div>
   </div>
 </div>
@@ -211,7 +211,7 @@ function renderBurn() {
   const useAuto = autoFresh();
   const cur = useAuto ? { status: auto.status } : burn;
   const cls = !cur ? "unk" : cur.status === "on" ? "on" : "off";
-  const label = !cur ? "Not set" : cur.status === "on" ? "BURN BAN IN EFFECT" : "No burn ban";
+  const label = !cur ? "Not Set" : cur.status === "on" ? "BURN BAN IN EFFECT" : "No Burn Ban";
   const b = document.createElement("div");
   b.className = "ban " + cls;
   b.textContent = label;
@@ -220,13 +220,23 @@ function renderBurn() {
   const info = document.createElement("div");
   info.className = "mu";
   if (useAuto) {
-    info.textContent = "Automatic: Texas A&M Forest Service county list, confirmed " + fmtTime(auto.verifiedAt) + ".";
+    info.textContent = "Automatic: Texas A&M Forest Service list" + (auto.feedAt ? " dated " + fmtTime(auto.feedAt) : "") + ". Last checked " + fmtTime(auto.verifiedAt) + ".";
   } else if (!burn) {
     info.textContent = "No status available. Check the Forest Service map below, then use the buttons.";
   } else {
     info.textContent = "Set by " + (burn.by || "someone") + " on " + fmtTime(burn.at);
   }
   el.appendChild(info);
+
+  if (useAuto) {
+    const hrs = Math.floor((Date.now() - Date.parse(auto.verifiedAt)) / 3600000);
+    if (hrs >= 6) {
+      const sw = document.createElement("div");
+      sw.className = "warn";
+      sw.textContent = "The automatic check hasn't run in " + hrs + " hours, so this may be out of date. Please verify with the Forest Service map.";
+      el.appendChild(sw);
+    }
+  }
 
   if (!useAuto) {
     const w = document.createElement("div");
@@ -261,11 +271,11 @@ function renderBurn() {
     btns.className = "btns";
     const on = document.createElement("button");
     on.className = "b";
-    on.textContent = "Set: Burn ban ACTIVE";
+    on.textContent = "Set: Burn Ban ACTIVE";
     on.onclick = () => setBurn("on");
     const off = document.createElement("button");
     off.className = "b g";
-    off.textContent = "Set: No burn ban";
+    off.textContent = "Set: No Burn Ban";
     off.onclick = () => setBurn("off");
     btns.append(on, off);
     el.appendChild(btns);
@@ -273,7 +283,7 @@ function renderBurn() {
 
   const l = document.createElement("div");
   l.className = "mu";
-  l.innerHTML = 'Verify: <a href="https://tfsweb.tamu.edu/TexasBurnBans" target="_blank" rel="noopener">Texas A&amp;M Forest Service burn ban map</a>';
+  l.innerHTML = 'Verify: <a href="https://tfsweb.tamu.edu/TexasBurnBans" target="_blank" rel="noopener">Texas A&amp;M Forest Service Burn Ban map</a>';
   el.appendChild(l);
 }
 
