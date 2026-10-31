@@ -331,6 +331,12 @@ function wxIcon(text, day) {
   return "🌡️";
 }
 
+function tempText(d) {
+  if (d.hi != null && d.lo != null) return d.hi + "°/" + d.lo + "°";
+  if (d.lo != null) return "Low " + d.lo + "°";
+  if (d.hi != null) return "High " + d.hi + "°";
+  return "—";
+}
 const cToF = c => Math.round(c * 9 / 5 + 32);
 const compass = deg => ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"][Math.round(deg / 22.5) % 16];
 function toMph(o) {
@@ -425,7 +431,7 @@ async function loadWeather() {
       ic.className = "ic";
       ic.textContent = wxIcon(d.fc, d.day);
       box.append(nm, ic,
-        document.createTextNode("\ud83c\udf21\ufe0f " + (d.hi != null ? d.hi + "\u00b0" : "\u2014") + "/" + (d.lo != null ? d.lo + "\u00b0" : "\u2014")),
+        document.createTextNode("\ud83c\udf21\ufe0f " + tempText(d)),
         document.createElement("br"), document.createTextNode("\u2614 " + d.pop + "% rain"));
       fc.appendChild(box);
     });
