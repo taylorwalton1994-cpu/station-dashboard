@@ -2,7 +2,7 @@ name: Update burn ban status
 
 on:
   schedule:
-    - cron: "17 */3 * * *"   # every 3 hours (GitHub runs on UTC time)
+    - cron: "23 * * * *"     # every hour at :23 (GitHub runs on UTC time)
   workflow_dispatch: {}        # lets you run it by hand from the Actions tab
 
 permissions:
@@ -47,40 +47,40 @@ jobs:
 
 
           def parse(raw, now):
-              """Return (ok, status, note). raw is bytes. status is 'on' or 'off' only when ok."""
+              """Return (ok, status, note, feed_iso). raw is bytes. status is 'on' or 'off' only when ok."""
               try:
                   root = to_root(raw)
               except ET.ParseError as e:
-                  return False, None, "Feed is not valid XML (%s). First bytes: %r" % (e, raw[:60])
+                  return False, None, "Feed is not valid XML (%s). First bytes: %r" % (e, raw[:60]), None
               item = root.find("channel/item")
               if item is None:
-                  return False, None, "Feed has no item"
+                  return False, None, "Feed has no item", None
               title = (item.findtext("title") or "").strip()
               desc = (item.findtext("description") or "").strip()
 
               m = re.match(r"^(\d+)\s+Texas Burn Bans?\s*-\s*(\d{1,2}/\d{1,2}/\d{4}\s+\d{1,2}:\d{2}:\d{2}\s*[AP]M)", title, re.I)
               if not m:
-                  return False, None, "Unexpected feed title: %r" % title[:80]
+                  return False, None, "Unexpected feed title: %r" % title[:80], None
               expected = int(m.group(1))
               try:
                   feed_time = datetime.strptime(re.sub(r"\s+", " ", m.group(2).upper()), "%m/%d/%Y %I:%M:%S %p")
                   feed_time = feed_time.replace(tzinfo=ZoneInfo("America/Chicago"))
               except Exception:
-                  return False, None, "Could not read feed date from title"
+                  return False, None, "Could not read feed date from title", None
 
               names = [re.sub(r"[^A-Z]", "", n.upper()) for n in desc.split(",")]
               names = [n for n in names if n]
               if len(names) != expected:
-                  return False, None, "Feed says %d bans but lists %d counties" % (expected, len(names))
+                  return False, None, "Feed says %d bans but lists %d counties" % (expected, len(names)), None
 
               age = now - feed_time.astimezone(timezone.utc)
               if age > timedelta(hours=MAX_FEED_AGE_HOURS):
-                  return False, None, "Feed is stale (last updated %s)" % feed_time.strftime("%m/%d/%Y %I:%M %p")
+                  return False, None, "Feed is stale (last updated %s)" % feed_time.strftime("%m/%d/%Y %I:%M %p"), None
 
               listed = "MCLENNAN" in names
               stamp = feed_time.strftime("%m/%d/%Y %I:%M %p CT")
               note = ("McLennan listed in feed" if listed else "McLennan not listed in feed") + " (%d counties banned statewide; feed time %s)" % (expected, stamp)
-              return True, ("on" if listed else "off"), note
+              return True, ("on" if listed else "off"), note, feed_time.astimezone(timezone.utc).isoformat(timespec="seconds")
 
 
           def main():
@@ -94,16 +94,17 @@ jobs:
                   except Exception:
                       old = {}
 
-              out = {"status": old.get("status"), "verifiedAt": old.get("verifiedAt"),
+              out = {"status": old.get("status"), "verifiedAt": old.get("verifiedAt"), "feedAt": old.get("feedAt"),
                      "checkedAt": stamp, "ok": False, "note": ""}
               try:
                   req = urllib.request.Request(URL, headers={"User-Agent": "Mozilla/5.0 station-dashboard"})
                   raw = urllib.request.urlopen(req, timeout=30).read()
-                  ok, status, note = parse(raw, now)
+                  ok, status, note, feed_iso = parse(raw, now)
                   out["note"] = note
                   if ok:
                       out["status"] = status
                       out["verifiedAt"] = stamp
+                      out["feedAt"] = feed_iso
                       out["ok"] = True
               except Exception as e:
                   out["note"] = "Could not read feed: %s" % e
