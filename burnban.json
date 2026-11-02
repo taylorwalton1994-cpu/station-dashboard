@@ -1,8 +1,8 @@
 {
   "status": "off",
-  "verifiedAt": "2026-11-01T18:58:36+00:00",
+  "verifiedAt": "2026-11-02T02:34:59+00:00",
   "feedAt": "2026-10-30T13:18:37+00:00",
-  "checkedAt": "2026-11-01T22:53:20+00:00",
-  "ok": false,
-  "note": "Could not read feed: <urlopen error timed out>"
+  "checkedAt": "2026-11-02T02:34:59+00:00",
+  "ok": true,
+  "note": "McLennan not listed in feed (149 counties banned statewide; feed time 10/30/2026 08:18 AM CT)"
 }
