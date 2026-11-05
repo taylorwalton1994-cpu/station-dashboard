@@ -2,7 +2,7 @@
   "status": "off",
   "verifiedAt": "2026-11-04T21:56:40+00:00",
   "feedAt": "2026-11-04T14:36:59+00:00",
-  "checkedAt": "2026-11-05T02:33:00+00:00",
+  "checkedAt": "2026-11-05T11:06:06+00:00",
   "ok": false,
   "note": "Could not read feed: <urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: certificate has expired (_ssl.c:1000)>"
 }
