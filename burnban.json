@@ -1,8 +1,8 @@
 {
   "status": "off",
-  "verifiedAt": "2026-11-04T21:56:40+00:00",
-  "feedAt": "2026-11-04T14:36:59+00:00",
-  "checkedAt": "2026-11-05T11:06:06+00:00",
-  "ok": false,
-  "note": "Could not read feed: <urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: certificate has expired (_ssl.c:1000)>"
+  "verifiedAt": "2026-11-05T18:49:19+00:00",
+  "feedAt": "2026-11-05T14:53:19+00:00",
+  "checkedAt": "2026-11-05T18:49:19+00:00",
+  "ok": true,
+  "note": "McLennan not listed in feed (129 counties banned statewide; feed time 11/05/2026 08:53 AM CT)"
 }
